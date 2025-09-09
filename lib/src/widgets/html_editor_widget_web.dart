@@ -74,6 +74,7 @@ class _HtmlEditorWidgetWebState extends State<HtmlEditorWidget> {
     var headString = '';
 var summernoteCallbacks = '''callbacks: {
   onInit: function() {
+    // Block events at editor level
     var editable = document.querySelector('.note-editable');
     if (editable) {
       editable.addEventListener('copy', function(e) { e.preventDefault(); });
@@ -81,18 +82,20 @@ var summernoteCallbacks = '''callbacks: {
       editable.addEventListener('drop', function(e) { e.preventDefault(); });
       editable.addEventListener('dragover', function(e) { e.preventDefault(); });
     }
+    // Block at document level, in capture phase (for all future .note-editable children)
     document.addEventListener('copy', function(e) {
       if (e.target.closest('.note-editable')) e.preventDefault();
-    });
+    }, true);
     document.addEventListener('paste', function(e) {
       if (e.target.closest('.note-editable')) e.preventDefault();
-    });
+    }, true);
     document.addEventListener('drop', function(e) {
       if (e.target.closest('.note-editable')) e.preventDefault();
-    });
+    }, true);
     document.addEventListener('dragover', function(e) {
       if (e.target.closest('.note-editable')) e.preventDefault();
-    });
+    }, true);
+    // Block at summernote container level as backup
     var editor = document.getElementById('summernote-2');
     if (editor) {
       editor.addEventListener('paste', function(e) { e.preventDefault(); });
@@ -103,14 +106,14 @@ var summernoteCallbacks = '''callbacks: {
     var chars = \$\(".note-editable"\).text();
     var totalChars = chars.length;
     ${widget.htmlEditorOptions.characterLimit != null ? '''allowedKeys = (
-      e.which === 8 || e.which === 35 || e.which === 36 || e.which === 37 || e.which === 38 || 
-      e.which === 39 || e.which === 40 || e.which === 46 || 
+      e.which === 8 || e.which === 35 || e.which === 36 || e.which === 37 || e.which === 38 ||
+      e.which === 39 || e.which === 40 || e.which === 46 ||
       e.ctrlKey === true && (e.which === 65 || e.which === 88 || e.which === 67 || e.which === 86 || e.which === 90)
     );
     if (!allowedKeys) {
       e.preventDefault();
     }''' : ''}
-    window.parent.postMessage(\$\({ "view": "$createdViewId", "type": "toDart: characterCount", "totalChars": totalChars }\), "*");
+    window.parent.postMessage(JSON.stringify({"view": "$createdViewId", "type": "toDart: characterCount", "totalChars": totalChars}), "*");
   },
   onImageUpload: function(files) {
     return false;
@@ -121,11 +124,14 @@ var summernoteCallbacks = '''callbacks: {
       e.clipboardData.clearData();
     }
     setTimeout(function() {
+      // Remove any sneaky pasted base64/HTML images after paste
+      \$\('.note-editable img'\).remove();
       \$\('#summernote-2'\).summernote('undo');
     }, 0);
     return false;
   }
 }''';
+
 
     var maximumFileSize = 10485760;
     for (var p in widget.plugins) {
