@@ -11,12 +11,7 @@ import 'dart:html' as html;
 import 'package:html_editor_enhanced/utils/shims/dart_ui.dart' as ui;
 
 
-const String disableCopyPasteJS = """
-document.addEventListener('copy', function(e) { e.preventDefault(); });
-document.addEventListener('paste', function(e) { e.preventDefault(); });
-document.querySelector('.note-editable').addEventListener('copy', function(e) { e.preventDefault(); });
-document.querySelector('.note-editable').addEventListener('paste', function(e) { e.preventDefault(); });
-""";
+
 
 /// The HTML Editor widget itself, for web (uses IFrameElement)
 class HtmlEditorWidget extends StatefulWidget {
@@ -77,44 +72,54 @@ class _HtmlEditorWidgetWebState extends State<HtmlEditorWidget> {
 
   void initSummernote() async {
     var headString = '';
-    var summernoteCallbacks = '''callbacks: {
-  onInit: function() {
-    var editable = document.querySelector('.note-editable');
-    if (editable) {
-      editable.addEventListener('copy', function(e) { e.preventDefault(); });
-      editable.addEventListener('paste', function(e) { e.preventDefault(); });
-    }
-    document.addEventListener('copy', function(e) {
-      if (e.target.closest('.note-editable')) e.preventDefault();
-    });
-    document.addEventListener('paste', function(e) {
-      if (e.target.closest('.note-editable')) e.preventDefault();
-    });
-  },
-  onKeydown: function(e) {
-      var chars = \$(".note-editable").text();
-      var totalChars = chars.length;
-      ${widget.htmlEditorOptions.characterLimit != null ? '''allowedKeys = (
-          e.which === 8 ||  /* BACKSPACE */
-          e.which === 35 || /* END */
-          e.which === 36 || /* HOME */
-          e.which === 37 || /* LEFT */
-          e.which === 38 || /* UP */
-          e.which === 39 || /* RIGHT*/
-          e.which === 40 || /* DOWN */
-          e.which === 46 || /* DEL*/
-          e.ctrlKey === true && e.which === 65 || /* CTRL + A */
-          e.ctrlKey === true && e.which === 88 || /* CTRL + X */
-          e.ctrlKey === true && e.which === 67 || /* CTRL + C */
-          e.ctrlKey === true && e.which === 86 || /* CTRL + V */
-          e.ctrlKey === true && e.which === 90    /* CTRL + Z */
-      );
-      if (!allowedKeys && \$(e.target).text().length >= ${widget.htmlEditorOptions.characterLimit}) {
-          e.preventDefault();
-      }''' : ''}
-      window.parent.postMessage(JSON.stringify({"view": "$createdViewId", "type": "toDart: characterCount", "totalChars": totalChars}), "*");
-  },
-''';
+   var summernoteCallbacks = '''callbacks: {
+  onInit: function() {
+    var editable = document.querySelector('.note-editable');
+    if (editable) {
+      editable.addEventListener('copy', function(e) { e.preventDefault(); });
+      editable.addEventListener('paste', function(e) { e.preventDefault(); });
+      editable.addEventListener('drop', function(e) { e.preventDefault(); });        // Block file/image drop
+      editable.addEventListener('dragover', function(e) { e.preventDefault(); });    // Block drag over
+    }
+    document.addEventListener('copy', function(e) {
+      if (e.target.closest('.note-editable')) e.preventDefault();
+    });
+    document.addEventListener('paste', function(e) {
+      if (e.target.closest('.note-editable')) e.preventDefault();
+    });
+    document.addEventListener('drop', function(e) {
+      if (e.target.closest('.note-editable')) e.preventDefault();
+    });
+    document.addEventListener('dragover', function(e) {
+      if (e.target.closest('.note-editable')) e.preventDefault();
+    });
+  },
+  onKeydown: function(e) {
+    var chars = \$(".note-editable").text();   
+    var totalChars = chars.length;
+    ${widget.htmlEditorOptions.characterLimit != null ? '''allowedKeys = (
+        e.which === 8 ||  /* BACKSPACE */
+        e.which === 35 || /* END */
+        e.which === 36 || /* HOME */
+        e.which === 37 || /* LEFT */
+        e.which === 38 || /* UP */
+        e.which === 39 || /* RIGHT*/
+        e.which === 40 || /* DOWN */
+        e.which === 46 || /* DEL*/
+        e.ctrlKey === true && e.which === 65 || /* CTRL + A */
+        e.ctrlKey === true && e.which === 88 || /* CTRL + X */
+        e.ctrlKey === true && e.which === 67 || /* CTRL + C */
+        e.ctrlKey === true && e.which === 86 || /* CTRL + V */
+        e.ctrlKey === true && e.which === 90    /* CTRL + Z */
+    );
+    if (!allowedKeys && \$(e.target).text().length >= ${widget.htmlEditorOptions.characterLimit}) {
+        e.preventDefault();
+    }''' : ''}
+    window.parent.postMessage(JSON.stringify({"view": "$createdViewId", "type": "toDart: characterCount", "totalChars": totalChars}), "*");
+  },
+  onImageUpload: function(files) { return false; },            // Block all file/image uploads
+  onPaste: function(e) { e.preventDefault(); return false; },  // Block any paste via Summernote
+}''';
     var maximumFileSize = 10485760;
     for (var p in widget.plugins) {
       headString = headString + p.getHeadString() + '\n';
