@@ -10,6 +10,14 @@ import 'package:html_editor_enhanced/utils/utils.dart';
 import 'dart:html' as html;
 import 'package:html_editor_enhanced/utils/shims/dart_ui.dart' as ui;
 
+
+const String disableCopyPasteJS = """
+document.addEventListener('copy', function(e) { e.preventDefault(); });
+document.addEventListener('paste', function(e) { e.preventDefault(); });
+document.querySelector('.note-editable').addEventListener('copy', function(e) { e.preventDefault(); });
+document.querySelector('.note-editable').addEventListener('paste', function(e) { e.preventDefault(); });
+""";
+
 /// The HTML Editor widget itself, for web (uses IFrameElement)
 class HtmlEditorWidget extends StatefulWidget {
   HtmlEditorWidget({
@@ -192,18 +200,23 @@ class _HtmlEditorWidgetWebState extends State<HtmlEditorWidget> {
     if (widget.callbacks != null) {
       jsCallbacks = getJsCallbacks(widget.callbacks!);
     }
-    var userScripts = '';
-    if (widget.htmlEditorOptions.webInitialScripts != null) {
-      widget.htmlEditorOptions.webInitialScripts!.forEach((element) {
-        userScripts = userScripts +
-            '''
-          if (data["type"].includes("${element.name}")) {
-            ${element.script}
-          }
-        ''' +
-            '\n';
-      });
-    }
+   var userScripts = '''
+$disableCopyPasteJS
+''';
+
+if (widget.htmlEditorOptions.webInitialScripts != null) {
+  widget.htmlEditorOptions.webInitialScripts!.forEach((element) {
+    userScripts +=
+      '''
+      if (data["type"].includes("${element.name}")) {
+        ${element.script}
+      }
+      ''' +
+      '\n';
+  });
+}
+
+
     var summernoteScripts = """
       <script type="text/javascript">
         \$(document).ready(function () {
