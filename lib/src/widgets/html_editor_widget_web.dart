@@ -76,15 +76,11 @@ var summernoteCallbacks = '''callbacks: {
   onInit: function() {
     var editable = document.querySelector('.note-editable');
     if (editable) {
-      // Block keyboard and context-menu copy/paste
       editable.addEventListener('copy', function(e) { e.preventDefault(); });
       editable.addEventListener('paste', function(e) { e.preventDefault(); });
-      
-      // Block drag-and-drop (image, file, HTML, etc.)
       editable.addEventListener('drop', function(e) { e.preventDefault(); });
       editable.addEventListener('dragover', function(e) { e.preventDefault(); });
     }
-    // Also cover bubbling/capturing at the document level
     document.addEventListener('copy', function(e) {
       if (e.target.closest('.note-editable')) e.preventDefault();
     });
@@ -97,7 +93,6 @@ var summernoteCallbacks = '''callbacks: {
     document.addEventListener('dragover', function(e) {
       if (e.target.closest('.note-editable')) e.preventDefault();
     });
-    // Extra backup: block paste and drop on the main editor element
     var editor = document.getElementById('summernote-2');
     if (editor) {
       editor.addEventListener('paste', function(e) { e.preventDefault(); });
@@ -105,42 +100,28 @@ var summernoteCallbacks = '''callbacks: {
     }
   },
   onKeydown: function(e) {
-    var chars = \$(".note-editable").text();   
+    var chars = \$\(".note-editable"\).text();
     var totalChars = chars.length;
     ${widget.htmlEditorOptions.characterLimit != null ? '''allowedKeys = (
-        e.which === 8 ||  /* BACKSPACE */
-        e.which === 35 || /* END */
-        e.which === 36 || /* HOME */
-        e.which === 37 || /* LEFT */
-        e.which === 38 || /* UP */
-        e.which === 39 || /* RIGHT*/
-        e.which === 40 || /* DOWN */
-        e.which === 46 || /* DEL*/
-        e.ctrlKey === true && e.which === 65 || /* CTRL + A */
-        e.ctrlKey === true && e.which === 88 || /* CTRL + X */
-        e.ctrlKey === true && e.which === 67 || /* CTRL + C */
-        e.ctrlKey === true && e.which === 86 || /* CTRL + V */
-        e.ctrlKey === true && e.which === 90    /* CTRL + Z */
+      e.which === 8 || e.which === 35 || e.which === 36 || e.which === 37 || e.which === 38 || 
+      e.which === 39 || e.which === 40 || e.which === 46 || 
+      e.ctrlKey === true && (e.which === 65 || e.which === 88 || e.which === 67 || e.which === 86 || e.which === 90)
     );
-    if (!allowedKeys && \$(e.target).text().length >= ${widget.htmlEditorOptions.characterLimit}) {
-        e.preventDefault();
+    if (!allowedKeys) {
+      e.preventDefault();
     }''' : ''}
-    window.parent.postMessage(JSON.stringify({"view": "$createdViewId", "type": "toDart: characterCount", "totalChars": totalChars}), "*");
+    window.parent.postMessage(\$\({ "view": "$createdViewId", "type": "toDart: characterCount", "totalChars": totalChars }\), "*");
   },
-  // Block ALL image upload (paste, drag, or manual upload)
-  onImageUpload: function(files) { return false; },
-  // Block ANY paste (text, html, or image) even if browser fires it
-  onPaste: function(e) { 
-    if (e && e.preventDefault) e.preventDefault();
-    // In case clipboardData is present, attempt to clear it
-    if (e && e.originalEvent && e.originalEvent.clipboardData) {
-      e.originalEvent.clipboardData.setData('text/plain', '');
-      e.originalEvent.clipboardData.setData('text/html', '');
-      e.originalEvent.clipboardData.setData('image/png', '');
+  onImageUpload: function(files) {
+    return false;
+  },
+  onPaste: function(e) {
+    e.preventDefault();
+    if (e.clipboardData) {
+      e.clipboardData.clearData();
     }
-    // As extra guard, immediately undo any content that sneaks in
     setTimeout(function() {
-      \$('#summernote-2').summernote('undo');
+      \$\('#summernote-2'\).summernote('undo');
     }, 0);
     return false;
   }
