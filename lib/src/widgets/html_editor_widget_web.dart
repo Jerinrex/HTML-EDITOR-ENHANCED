@@ -72,15 +72,19 @@ class _HtmlEditorWidgetWebState extends State<HtmlEditorWidget> {
 
   void initSummernote() async {
     var headString = '';
-   var summernoteCallbacks = '''callbacks: {
+var summernoteCallbacks = '''callbacks: {
   onInit: function() {
     var editable = document.querySelector('.note-editable');
     if (editable) {
+      // Block keyboard and context-menu copy/paste
       editable.addEventListener('copy', function(e) { e.preventDefault(); });
       editable.addEventListener('paste', function(e) { e.preventDefault(); });
-      editable.addEventListener('drop', function(e) { e.preventDefault(); });        // Block file/image drop
-      editable.addEventListener('dragover', function(e) { e.preventDefault(); });    // Block drag over
+      
+      // Block drag-and-drop (image, file, HTML, etc.)
+      editable.addEventListener('drop', function(e) { e.preventDefault(); });
+      editable.addEventListener('dragover', function(e) { e.preventDefault(); });
     }
+    // Also cover bubbling/capturing at the document level
     document.addEventListener('copy', function(e) {
       if (e.target.closest('.note-editable')) e.preventDefault();
     });
@@ -93,6 +97,12 @@ class _HtmlEditorWidgetWebState extends State<HtmlEditorWidget> {
     document.addEventListener('dragover', function(e) {
       if (e.target.closest('.note-editable')) e.preventDefault();
     });
+    // Extra backup: block paste and drop on the main editor element
+    var editor = document.getElementById('summernote-2');
+    if (editor) {
+      editor.addEventListener('paste', function(e) { e.preventDefault(); });
+      editor.addEventListener('drop', function(e) { e.preventDefault(); });
+    }
   },
   onKeydown: function(e) {
     var chars = \$(".note-editable").text();   
@@ -117,9 +127,25 @@ class _HtmlEditorWidgetWebState extends State<HtmlEditorWidget> {
     }''' : ''}
     window.parent.postMessage(JSON.stringify({"view": "$createdViewId", "type": "toDart: characterCount", "totalChars": totalChars}), "*");
   },
-  onImageUpload: function(files) { return false; },            // Block all file/image uploads
-  onPaste: function(e) { e.preventDefault(); return false; },  // Block any paste via Summernote
+  // Block ALL image upload (paste, drag, or manual upload)
+  onImageUpload: function(files) { return false; },
+  // Block ANY paste (text, html, or image) even if browser fires it
+  onPaste: function(e) { 
+    if (e && e.preventDefault) e.preventDefault();
+    // In case clipboardData is present, attempt to clear it
+    if (e && e.originalEvent && e.originalEvent.clipboardData) {
+      e.originalEvent.clipboardData.setData('text/plain', '');
+      e.originalEvent.clipboardData.setData('text/html', '');
+      e.originalEvent.clipboardData.setData('image/png', '');
+    }
+    // As extra guard, immediately undo any content that sneaks in
+    setTimeout(function() {
+      \$('#summernote-2').summernote('undo');
+    }, 0);
+    return false;
+  }
 }''';
+
     var maximumFileSize = 10485760;
     for (var p in widget.plugins) {
       headString = headString + p.getHeadString() + '\n';
