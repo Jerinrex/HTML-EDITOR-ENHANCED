@@ -246,6 +246,7 @@ var summernoteCallbacks = '''callbacks: {
     var summernoteScripts = """
       <script type="text/javascript">
         \$(document).ready(function () {
+         console.log('THIS IS MY PATCHED SUMMERNOTE CONFIG');
       \$('#summernote-2').summernote({
   placeholder: "${widget.htmlEditorOptions.hint}",
   tabsize: 2,
