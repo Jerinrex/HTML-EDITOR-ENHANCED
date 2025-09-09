@@ -246,16 +246,23 @@ var summernoteCallbacks = '''callbacks: {
     var summernoteScripts = """
       <script type="text/javascript">
         \$(document).ready(function () {
-          \$('#summernote-2').summernote({
-            placeholder: "${widget.htmlEditorOptions.hint}",
-            tabsize: 2,
-            height: ${widget.otherOptions.height},
-            disableGrammar: false,
-            spellCheck: ${widget.htmlEditorOptions.spellCheck},
-            maximumFileSize: $maximumFileSize,
-            ${widget.htmlEditorOptions.customOptions}
-            $summernoteCallbacks
-          });
+      \$('#summernote-2').summernote({
+  placeholder: "${widget.htmlEditorOptions.hint}",
+  tabsize: 2,
+  height: ${widget.otherOptions.height},
+  disableGrammar: false,
+  spellCheck: ${widget.htmlEditorOptions.spellCheck},
+  maximumFileSize: $maximumFileSize,
+  // STRICT toolbar: No 'insert', 'picture', 'image', 'media', etc.
+  toolbar: [
+    ['style', ['bold', 'italic', 'underline', 'clear']],
+    ['para', ['ul', 'ol', 'paragraph']]
+  ],
+  // Disable ALL image popover/context actions
+  popover: { image: [] },
+  ${widget.htmlEditorOptions.customOptions}
+  $summernoteCallbacks
+});
           
           \$('#summernote-2').on('summernote.change', function(_, contents, \$editable) {
             window.parent.postMessage(JSON.stringify({"view": "$createdViewId", "type": "toDart: onChangeContent", "contents": contents}), "*");
