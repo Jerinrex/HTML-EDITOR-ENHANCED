@@ -10,6 +10,9 @@ import 'package:html_editor_enhanced/utils/utils.dart';
 import 'dart:html' as html;
 import 'package:html_editor_enhanced/utils/shims/dart_ui.dart' as ui;
 
+
+
+
 /// The HTML Editor widget itself, for web (uses IFrameElement)
 class HtmlEditorWidget extends StatefulWidget {
   HtmlEditorWidget({
@@ -69,31 +72,67 @@ class _HtmlEditorWidgetWebState extends State<HtmlEditorWidget> {
 
   void initSummernote() async {
     var headString = '';
-    var summernoteCallbacks = '''callbacks: {
-        onKeydown: function(e) {
-            var chars = \$(".note-editable").text();
-            var totalChars = chars.length;
-            ${widget.htmlEditorOptions.characterLimit != null ? '''allowedKeys = (
-                e.which === 8 ||  /* BACKSPACE */
-                e.which === 35 || /* END */
-                e.which === 36 || /* HOME */
-                e.which === 37 || /* LEFT */
-                e.which === 38 || /* UP */
-                e.which === 39 || /* RIGHT*/
-                e.which === 40 || /* DOWN */
-                e.which === 46 || /* DEL*/
-                e.ctrlKey === true && e.which === 65 || /* CTRL + A */
-                e.ctrlKey === true && e.which === 88 || /* CTRL + X */
-                e.ctrlKey === true && e.which === 67 || /* CTRL + C */
-                e.ctrlKey === true && e.which === 86 || /* CTRL + V */
-                e.ctrlKey === true && e.which === 90    /* CTRL + Z */
-            );
-            if (!allowedKeys && \$(e.target).text().length >= ${widget.htmlEditorOptions.characterLimit}) {
-                e.preventDefault();
-            }''' : ''}
-            window.parent.postMessage(JSON.stringify({"view": "$createdViewId", "type": "toDart: characterCount", "totalChars": totalChars}), "*");
-        },
-    ''';
+var summernoteCallbacks = '''callbacks: {
+  onInit: function() {
+    // Block events at editor level
+    var editable = document.querySelector('.note-editable');
+    if (editable) {
+      editable.addEventListener('copy', function(e) { e.preventDefault(); });
+      editable.addEventListener('paste', function(e) { e.preventDefault(); });
+      editable.addEventListener('drop', function(e) { e.preventDefault(); });
+      editable.addEventListener('dragover', function(e) { e.preventDefault(); });
+    }
+    // Block at document level, in capture phase (for all future .note-editable children)
+    document.addEventListener('copy', function(e) {
+      if (e.target.closest('.note-editable')) e.preventDefault();
+    }, true);
+    document.addEventListener('paste', function(e) {
+      if (e.target.closest('.note-editable')) e.preventDefault();
+    }, true);
+    document.addEventListener('drop', function(e) {
+      if (e.target.closest('.note-editable')) e.preventDefault();
+    }, true);
+    document.addEventListener('dragover', function(e) {
+      if (e.target.closest('.note-editable')) e.preventDefault();
+    }, true);
+    // Block at summernote container level as backup
+    var editor = document.getElementById('summernote-2');
+    if (editor) {
+      editor.addEventListener('paste', function(e) { e.preventDefault(); });
+      editor.addEventListener('drop', function(e) { e.preventDefault(); });
+    }
+  },
+  onKeydown: function(e) {
+    var chars = \$\(".note-editable"\).text();
+    var totalChars = chars.length;
+    ${widget.htmlEditorOptions.characterLimit != null ? '''allowedKeys = (
+      e.which === 8 || e.which === 35 || e.which === 36 || e.which === 37 || e.which === 38 ||
+      e.which === 39 || e.which === 40 || e.which === 46 ||
+      e.ctrlKey === true && (e.which === 65 || e.which === 88 || e.which === 67 || e.which === 86 || e.which === 90)
+    );
+    if (!allowedKeys) {
+      e.preventDefault();
+    }''' : ''}
+    window.parent.postMessage(JSON.stringify({"view": "$createdViewId", "type": "toDart: characterCount", "totalChars": totalChars}), "*");
+  },
+  onImageUpload: function(files) {
+    return false;
+  },
+  onPaste: function(e) {
+    e.preventDefault();
+    if (e.clipboardData) {
+      e.clipboardData.clearData();
+    }
+    setTimeout(function() {
+      // Remove any sneaky pasted base64/HTML images after paste
+      \$\('.note-editable img'\).remove();
+      \$\('#summernote-2'\).summernote('undo');
+    }, 0);
+    return false;
+  }
+}''';
+
+
     var maximumFileSize = 10485760;
     for (var p in widget.plugins) {
       headString = headString + p.getHeadString() + '\n';
@@ -207,16 +246,24 @@ class _HtmlEditorWidgetWebState extends State<HtmlEditorWidget> {
     var summernoteScripts = """
       <script type="text/javascript">
         \$(document).ready(function () {
-          \$('#summernote-2').summernote({
-            placeholder: "${widget.htmlEditorOptions.hint}",
-            tabsize: 2,
-            height: ${widget.otherOptions.height},
-            disableGrammar: false,
-            spellCheck: ${widget.htmlEditorOptions.spellCheck},
-            maximumFileSize: $maximumFileSize,
-            ${widget.htmlEditorOptions.customOptions}
-            $summernoteCallbacks
-          });
+         console.log('THIS IS MY PATCHED SUMMERNOTE CONFIG');
+      \$('#summernote-2').summernote({
+  placeholder: "${widget.htmlEditorOptions.hint}",
+  tabsize: 2,
+  height: ${widget.otherOptions.height},
+  disableGrammar: false,
+  spellCheck: ${widget.htmlEditorOptions.spellCheck},
+  maximumFileSize: $maximumFileSize,
+  // STRICT toolbar: No 'insert', 'picture', 'image', 'media', etc.
+  toolbar: [
+    ['style', ['bold', 'italic', 'underline', 'clear']],
+    ['para', ['ul', 'ol', 'paragraph']]
+  ],
+  // Disable ALL image popover/context actions
+  popover: { image: [] },
+  ${widget.htmlEditorOptions.customOptions}
+  $summernoteCallbacks
+});
           
           \$('#summernote-2').on('summernote.change', function(_, contents, \$editable) {
             window.parent.postMessage(JSON.stringify({"view": "$createdViewId", "type": "toDart: onChangeContent", "contents": contents}), "*");
